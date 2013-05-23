@@ -1,3 +1,9 @@
+hiera (1.2.1-1puppetlabs1pexip1) precise; urgency=low
+
+  * Repackage for Pexip
+
+ -- John-Mark Bell <jmb@pexip.com>  Thu, 23 May 2013 15:11:09 +0100
+
 hiera (1.2.1-1puppetlabs1) lucid squeeze precise quantal wheezy sid unstable; urgency=low
 
   * update to version 1.2.1-1puppetlabs1
