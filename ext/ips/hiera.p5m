@@ -1,6 +1,6 @@
-set name=pkg.fmri value=pkg://puppetlabs.com/application/hiera@1.2.1,11.4.2-0
+set name=pkg.fmri value=pkg://puppetlabs.com/application/@1.3.4,13.2.0-0
 set name=pkg.summary value="Light weight hierarchical data store"
-set name=pkg.human-version value="1.2.1"
+set name=pkg.human-version value="1.3.4"
 set name=pkg.description value="A pluggable data store for hierarcical data"
 set name=info.classification value="org.opensolaris.category.2008:Applications/System Utilities"
 set name=org.opensolaris.consolidation value="puppet"
