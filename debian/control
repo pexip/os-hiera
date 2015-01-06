@@ -6,6 +6,7 @@ XSBC-Original-Maintainer: Puppet Labs <info@puppetlabs.com>
 Build-Depends: debhelper (>= 7.0.0), cdbs, quilt, ruby | ruby-interpreter
 Standards-Version: 3.9.2
 Homepage: http://projects.puppetlabs.com/projects/hiera
+XS-Pexip-Upstream: http://apt.puppetlabs.com/ precise
 
 Package: hiera
 Architecture: all
