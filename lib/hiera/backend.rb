@@ -1,5 +1,5 @@
 require 'hiera/util'
-require 'hiera/recursive_lookup'
+require 'hiera/interpolate'
 
 begin
   require 'deep_merge'
@@ -8,21 +8,25 @@ end
 
 class Hiera
   module Backend
-    INTERPOLATION = /%\{([^\}]*)\}/
-
     class << self
       # Data lives in /var/lib/hiera by default.  If a backend
       # supplies a datadir in the config it will be used and
       # subject to variable expansion based on scope
       def datadir(backend, scope)
         backend = backend.to_sym
-        default = Hiera::Util.var_dir
 
-        if Config.include?(backend)
-          parse_string(Config[backend][:datadir] || default, scope)
+        if Config[backend] && Config[backend][:datadir]
+          dir = Config[backend][:datadir]
         else
-          parse_string(default, scope)
+          dir = Hiera::Util.var_dir
         end
+
+        if !dir.is_a?(String)
+          raise(Hiera::InvalidConfigurationError,
+                "datadir for #{backend} cannot be an array")
+        end
+
+        parse_string(dir, scope)
       end
 
       # Finds the path to a datafile based on the Backend#datadir
@@ -30,15 +34,19 @@ class Hiera
       #
       # If the file is not found nil is returned
       def datafile(backend, scope, source, extension)
-        file = File.join([datadir(backend, scope), "#{source}.#{extension}"])
+        datafile_in(datadir(backend, scope), source, extension)
+      end
 
-        unless File.exist?(file)
+      # @api private
+      def datafile_in(datadir, source, extension)
+        file = File.join(datadir, "#{source}.#{extension}")
+
+        if File.exist?(file)
+          file
+        else
           Hiera.debug("Cannot find datafile #{file}, skipping")
-
-          return nil
+          nil
         end
-
-        return file
       end
 
       # Constructs a list of data sources to search
@@ -69,6 +77,35 @@ class Hiera
         end
       end
 
+      # Constructs a list of data files to search
+      #
+      # If you give it a specific hierarchy it will just use that
+      # else it will use the global configured one, failing that
+      # it will just look in the 'common' data source.
+      #
+      # An override can be supplied that will be pre-pended to the
+      # hierarchy.
+      #
+      # The source names will be subject to variable expansion based
+      # on scope
+      #
+      # Only files that exist will be returned. If the file is missing, then
+      # the block will not receive the file.
+      #
+      # @yield [String, String] the source string and the name of the resulting file
+      # @api public
+      def datasourcefiles(backend, scope, extension, override=nil, hierarchy=nil)
+        datadir = Backend.datadir(backend, scope)
+        Backend.datasources(scope, override, hierarchy) do |source|
+          Hiera.debug("Looking for data source #{source}")
+          file = datafile_in(datadir, source, extension)
+
+          if file
+            yield source, file
+          end
+        end
+      end
+
       # Parse a string like <code>'%{foo}'</code> against a supplied
       # scope and additional scope.  If either scope or
       # extra_scope includes the variable 'foo', then it will
@@ -85,22 +122,8 @@ class Hiera
       #
       # @api public
       def parse_string(data, scope, extra_data={})
-        interpolate(data, Hiera::RecursiveLookup.new(scope, extra_data))
+        Hiera::Interpolate.interpolate(data, scope, extra_data)
       end
-
-      def interpolate(data, values)
-        if data.is_a?(String)
-          data.gsub(INTERPOLATION) do
-            name = $1
-            values.lookup(name) do |value|
-              interpolate(value, values)
-            end
-          end
-        else
-          data
-        end
-      end
-      private :interpolate
 
       # Parses a answer received from data files
       #
@@ -114,7 +137,8 @@ class Hiera
         elsif data.is_a?(Hash)
           answer = {}
           data.each_pair do |key, val|
-            answer[key] = parse_answer(val, scope, extra_data)
+            interpolated_key = parse_string(key, scope, extra_data)
+            answer[interpolated_key] = parse_answer(val, scope, extra_data)
           end
 
           return answer
@@ -145,7 +169,7 @@ class Hiera
       # Deep merge options use the Hash utility function provided by [deep_merge](https://github.com/peritor/deep_merge)
       #
       #  :native => Native Hash.merge
-      #  :deep   => Use Hash.deep_merge  
+      #  :deep   => Use Hash.deep_merge
       #  :deeper => Use Hash.deep_merge!
       #
       def merge_answer(left,right)
@@ -204,6 +228,10 @@ class Hiera
 
         return default if answer.nil?
         return answer
+      end
+
+      def clear!
+        @backends = {}
       end
     end
   end
